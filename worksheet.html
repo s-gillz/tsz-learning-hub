@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Study Zone - Worksheet</title>
+  <style>
+    * { 
+      -webkit-user-select: none; 
+      -moz-user-select: none; 
+      -ms-user-select: none; 
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      min-height: 100vh;
+      color: #2d3748;
+    }
+    .watermark {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 9999; opacity: 0.06;
+      background: repeating-linear-gradient(-45deg, transparent, transparent 30px, rgba(102, 126, 234, 0.1) 30px, rgba(102, 126, 234, 0.1) 60px);
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; padding: 20px 30px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+    }
+    .timer {
+      background: rgba(255,255,255,0.2); padding: 8px 16px;
+      border-radius: 20px; font-size: 16px; font-weight: bold;
+      font-family: 'Courier New', monospace; float: right;
+    }
+    .container { max-width: 800px; margin: 0 auto; padding: 30px 20px 100px; }
+    .question-card {
+      background: white; border-radius: 16px; padding: 25px;
+      margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      display: none;
+    }
+    .question-card.active { display: block; }
+    .question-number {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; border-radius: 50%; font-weight: bold; margin-bottom: 15px;
+    }
+    .question-text { font-size: 16px; line-height: 1.7; margin-bottom: 20px; font-weight: 500; }
+    .text-input {
+      width: 100%; padding: 14px 18px; border: 2px solid #e2e8f0;
+      border-radius: 12px; font-size: 16px; background: #fafafa;
+    }
+    .text-input:focus { outline: none; border-color: #667eea; background: white; }
+    .option-list { display: flex; flex-direction: column; gap: 10px; }
+    .option-item {
+      display: flex; align-items: center; padding: 14px 18px;
+      border: 2px solid #e2e8f0; border-radius: 12px; cursor: pointer; background: #fafafa;
+    }
+    .option-item.selected { border-color: #667eea; background: #f7fafc; }
+    .option-item input { margin-right: 12px; width: 20px; height: 20px; }
+    .nav-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; background: white;
+      padding: 15px 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+      display: flex; justify-content: space-between; z-index: 200;
+    }
+    .btn {
+      padding: 12px 28px; border-radius: 25px; font-size: 15px;
+      font-weight: bold; cursor: pointer; border: none;
+    }
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .btn-success { background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; }
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white; border-radius: 20px; padding: 40px;
+      max-width: 450px; width: 90%; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="watermark"></div>
+  <div class="header">
+    <h1 style="display:inline;">🎯 The Study Zone</h1>
+    <div class="timer" id="timer">30:00</div>
+    <div style="clear:both;"></div>
+  </div>
+  
+  <div class="container" id="worksheetContainer">
+    <div id="questionsContainer"></div>
+  </div>
+  
+  <div class="nav-bar">
+    <button class="btn" onclick="prevQuestion()" id="prevBtn" style="background:#edf2f7;color:#4a5568;">← Previous</button>
+    <button class="btn btn-primary" onclick="nextQuestion()" id="nextBtn">Next →</button>
+    <button class="btn btn-success" onclick="submitWorksheet()" id="submitBtn" style="display:none;">✅ Submit</button>
+  </div>
+  
+  <div class="modal-overlay" id="submitModal">
+    <div class="modal">
+      <h2>🎉 Ready to Submit?</h2>
+      <p>Please review your answers before submitting.</p>
+      <button class="btn" onclick="document.getElementById('submitModal').classList.remove('show')" style="background:#edf2f7;color:#4a5568;margin-right:10px;">Go Back</button>
+      <button class="btn btn-success" onclick="confirmSubmit()">Submit Now</button>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <script>
+    const firebaseConfig = {
+      // 🔴 PASTE YOUR FIREBASE CONFIG HERE
+      apiKey: "AIzaSyAk-zd9SFsvwEc45cehgZmyVPco6rxU5_4",
+  authDomain: "tsz-learning-hub.firebaseapp.com",
+  projectId: "tsz-learning-hub",
+  storageBucket: "tsz-learning-hub.firebasestorage.app",
+  messagingSenderId: "793215873084",
+  appId: "1:793215873084:web:4b43c5f017bc888da01339"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    
+    // ========== ANTI-CHEAT ==========
+    document.addEventListener('contextmenu', e => { e.preventDefault(); logBehavior('rightClick'); return false; });
+    document.addEventListener('copy', e => { e.preventDefault(); logBehavior('copy'); return false; });
+    document.addEventListener('paste', e => { e.preventDefault(); logBehavior('paste'); return false; });
+    document.addEventListener('cut', e => { e.preventDefault(); return false; });
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && ['c','v','x','a','s','p','u','j'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        if (e.key.toLowerCase() === 'c') logBehavior('copy');
+        if (e.key.toLowerCase() === 'v') logBehavior('paste');
+        return false;
+      }
+      if (e.key === 'F12' || e.key === 'PrintScreen') {
+        e.preventDefault(); logBehavior('screenshot'); return false;
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { behaviorLog.tabSwitches++; logBehavior('tabSwitch'); }
+    });
+    
+    let behaviorLog = { tabSwitches: 0, rightClicks: 0, copyAttempts: 0, pasteAttempts: 0, screenshotAttempts: 0, fullscreenExits: 0 };
+    function logBehavior(type) {
+      if (type === 'rightClick') behaviorLog.rightClicks++;
+      if (type === 'copy') behaviorLog.copyAttempts++;
+      if (type === 'paste') behaviorLog.pasteAttempts++;
+      if (type === 'screenshot') behaviorLog.screenshotAttempts++;
+    }
+    
+    // ========== WORKSHEET LOGIC ==========
+    let currentQuestion = 0;
+    let answers = {};
+    let worksheetData = null;
+    let assignmentId = null;
+    let startTime = Date.now();
+    
+    // Get assignment ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    assignmentId = urlParams.get('id');
+    
+    if (!assignmentId) {
+      document.getElementById('worksheetContainer').innerHTML = '<h2 style="text-align:center;padding:60px;">Invalid worksheet link</h2>';
+    }
+    
+    // Load worksheet from Firestore
+    async function loadWorksheet() {
+      const doc = await db.collection('assignments').doc(assignmentId).get();
+      if (!doc.exists) {
+        document.getElementById('worksheetContainer').innerHTML = '<h2 style="text-align:center;padding:60px;">Worksheet not found</h2>';
+        return;
+      }
+      
+      const data = doc.data();
+      worksheetData = JSON.parse(data.worksheetData);
+      renderQuestions();
+      startTimer();
+    }
+    
+    function renderQuestions() {
+      const container = document.getElementById('questionsContainer');
+      container.innerHTML = '';
+      
+      worksheetData.questions.forEach((q, index) => {
+        const card = document.createElement('div');
+        card.className = 'question-card' + (index === 0 ? ' active' : '');
+        card.id = 'q-' + index;
+        
+        let input = '';
+        if (q.type === 'multiple_choice') {
+          input = '<div class="option-list">' + q.options.map((opt, i) => 
+            '<div class="option-item" onclick="selectOption(' + index + ', \\'' + opt.charAt(0) + '\\')">' +
+            '<input type="radio" name="q' + index + '">' +
+            '<span>' + opt + '</span></div>'
+          ).join('') + '</div>';
+        } else {
+          input = '<textarea class="text-input" rows="4" placeholder="Your answer..." oninput="saveAnswer(' + index + ', this.value)"></textarea>';
+        }
+        
+        card.innerHTML = 
+          '<div class="question-number">' + q.questionId + '</div>' +
+          '<div class="question-text">' + q.questionText + '</div>' + input;
+        
+        container.appendChild(card);
+      });
+    }
+    
+    function selectOption(qIndex, value) {
+      const card = document.getElementById('q-' + qIndex);
+      card.querySelectorAll('.option-item').forEach((opt, i) => {
+        opt.classList.toggle('selected', opt.textContent.charAt(0) === value);
+      });
+      saveAnswer(qIndex, value);
+    }
+    
+    function saveAnswer(index, value) {
+      answers[index + 1] = value;
+    }
+    
+    function nextQuestion() {
+      if (currentQuestion < worksheetData.questions.length - 1) {
+        document.getElementById('q-' + currentQuestion).classList.remove('active');
+        currentQuestion++;
+        document.getElementById('q-' + currentQuestion).classList.add('active');
+        updateNav();
+      }
+    }
+    
+    function prevQuestion() {
+      if (currentQuestion > 0) {
+        document.getElementById('q-' + currentQuestion).classList.remove('active');
+        currentQuestion--;
+        document.getElementById('q-' + currentQuestion).classList.add('active');
+        updateNav();
+      }
+    }
+    
+    function updateNav() {
+      document.getElementById('prevBtn').style.display = currentQuestion === 0 ? 'none' : 'inline-block';
+      const isLast = currentQuestion === worksheetData.questions.length - 1;
+      document.getElementById('nextBtn').style.display = isLast ? 'none' : 'inline-block';
+      document.getElementById('submitBtn').style.display = isLast ? 'inline-block' : 'none';
+    }
+    
+    function startTimer() {
+      let seconds = (worksheetData.estimatedTimeMinutes || 30) * 60;
+      setInterval(() => {
+        seconds--;
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        document.getElementById('timer').textContent = m + ':' + s;
+        if (seconds <= 0) submitWorksheet();
+      }, 1000);
+    }
+    
+    function submitWorksheet() {
+      document.getElementById('submitModal').classList.add('show');
+    }
+    
+    async function confirmSubmit() {
+      const timeSpent = Math.round((Date.now() - startTime) / 1000);
+      const suspiciousScore = calculateSuspiciousScore();
+      
+      await db.collection('submissions').add({
+        assignmentId: assignmentId,
+        studentId: auth.currentUser.uid,
+        answers: answers,
+        timeSpent: timeSpent,
+        behavior: behaviorLog,
+        suspiciousScore: suspiciousScore,
+        submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 'submitted'
+      });
+      
+      // Update assignment status
+      await db.collection('assignments').doc(assignmentId).update({ status: 'Completed' });
+      
+      alert('✅ Worksheet submitted! Your tutor will review your work.');
+      window.location.href = 'dashboard.html';
+    }
+    
+    function calculateSuspiciousScore() {
+      let score = 0;
+      if (behaviorLog.tabSwitches > 5) score += Math.min((behaviorLog.tabSwitches - 5) * 5, 30);
+      if (behaviorLog.rightClicks > 3) score += Math.min((behaviorLog.rightClicks - 3) * 5, 20);
+      if (behaviorLog.copyAttempts > 0) score += behaviorLog.copyAttempts * 15;
+      if (behaviorLog.pasteAttempts > 0) score += behaviorLog.pasteAttempts * 20;
+      return Math.min(score, 100);
+    }
+    
+    // Check auth and load
+    auth.onAuthStateChanged(user => {
+      if (!user) window.location.href = 'index.html';
+      else loadWorksheet();
+    });
+  </script>
+</body>
+</html>
