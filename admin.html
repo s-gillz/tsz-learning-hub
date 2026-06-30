@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>The Study Zone - Tutor Panel</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; padding: 30px; }
+    .card { background: white; padding: 25px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    h1 { color: #667eea; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; }
+    input, select, textarea { width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+    .btn { padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f8f9fa; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>🎯 The Study Zone - Tutor Panel</h1>
+  
+  <div class="card">
+    <h2>Generate Worksheet</h2>
+    <div class="form-group">
+      <label>Student</label>
+      <select id="studentSelect"><option>Loading...</option></select>
+    </div>
+    <div class="form-group">
+      <label>Grade</label>
+      <select id="gradeSelect">
+        <option value="1">Grade 1</option>
+        <option value="2">Grade 2</option>
+        <option value="3">Grade 3</option>
+        <option value="4">Grade 4</option>
+        <option value="5">Grade 5</option>
+        <option value="6">Grade 6</option>
+        <option value="7">Grade 7</option>
+        <option value="8">Grade 8</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Subject</label>
+      <select id="subjectSelect">
+        <option>Mathematics</option>
+        <option>Language</option>
+        <option>Science and Technology</option>
+        <option>STEAM</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Expectation Code</label>
+      <input type="text" id="expCode" placeholder="e.g., B1.3">
+    </div>
+    <div class="form-group">
+      <label>Expectation Text</label>
+      <textarea id="expText" rows="3" placeholder="Paste the Ontario expectation here..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Number of Questions</label>
+      <input type="number" id="numQuestions" value="10" min="5" max="20">
+    </div>
+    <button class="btn" onclick="generateWorksheet()">Generate & Assign</button>
+    <div id="status" style="margin-top:10px;color:#28a745;"></div>
+  </div>
+  
+  <div class="card">
+    <h2>Recent Submissions</h2>
+    <table id="submissionsTable">
+      <thead><tr><th>Student</th><th>Worksheet</th><th>Score</th><th>Focus</th><th>Date</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <script>
+    const firebaseConfig = {
+      // 🔴 PASTE YOUR FIREBASE CONFIG
+      apiKey: "AIzaSyAk-zd9SFsvwEc45cehgZmyVPco6rxU5_4",
+  authDomain: "tsz-learning-hub.firebaseapp.com",
+  projectId: "tsz-learning-hub",
+  storageBucket: "tsz-learning-hub.firebasestorage.app",
+  messagingSenderId: "793215873084",
+  appId: "1:793215873084:web:4b43c5f017bc888da01339"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    
+    // Load students
+    async function loadStudents() {
+      const snapshot = await db.collection('students').get();
+      const select = document.getElementById('studentSelect');
+      select.innerHTML = snapshot.docs.map(d => {
+        const s = d.data();
+        return `<option value="${s.studentId}">${s.name} (Grade ${s.grade})</option>`;
+      }).join('');
+    }
+    
+    async function generateWorksheet() {
+      const studentId = document.getElementById('studentSelect').value;
+      const grade = document.getElementById('gradeSelect').value;
+      const subject = document.getElementById('subjectSelect').value;
+      const expCode = document.getElementById('expCode').value;
+      const expText = document.getElementById('expText').value;
+      const numQuestions = document.getElementById('numQuestions').value;
+      
+      document.getElementById('status').textContent = 'Generating...';
+      
+      // Call Gemini API through a Cloud Function (you'd need to set this up)
+      // For now, create a placeholder worksheet
+      const worksheetData = {
+        worksheetTitle: `Grade ${grade} ${subject} - ${expCode}`,
+        estimatedTimeMinutes: 30,
+        questions: Array.from({length: numQuestions}, (_, i) => ({
+          questionId: i + 1,
+          type: i < 5 ? 'multiple_choice' : 'fill_in_blank',
+          questionText: `Sample question ${i + 1} for ${expText}`,
+          options: ['A) Option 1', 'B) Option 2', 'C) Option 3', 'D) Option 4'],
+          correctAnswer: 'B',
+          marks: 2
+        }))
+      };
+      
+      await db.collection('assignments').add({
+        studentId: studentId,
+        grade: parseInt(grade),
+        subject: subject,
+        expectationCode: expCode,
+        worksheetTitle: worksheetData.worksheetTitle,
+        worksheetData: JSON.stringify(worksheetData),
+        assignedDate: firebase.firestore.FieldValue.serverTimestamp(),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: 'Assigned'
+      });
+      
+      document.getElementById('status').textContent = '✅ Worksheet assigned!';
+      loadSubmissions();
+    }
+    
+    async function loadSubmissions() {
+      const snapshot = await db.collection('submissions').orderBy('submittedAt', 'desc').limit(20).get();
+      const tbody = document.querySelector('#submissionsTable tbody');
+      tbody.innerHTML = snapshot.docs.map(d => {
+        const s = d.data();
+        return `<tr>
+          <td>${s.studentId}</td>
+          <td>${s.assignmentId}</td>
+          <td>${s.suspiciousScore || 0}</td>
+          <td>${100 - (s.suspiciousScore || 0)}</td>
+          <td>${s.submittedAt ? s.submittedAt.toDate().toLocaleDateString() : 'N/A'}</td>
+        </tr>`;
+      }).join('');
+    }
+    
+    loadStudents();
+    loadSubmissions();
+  </script>
+</body>
+</html>
